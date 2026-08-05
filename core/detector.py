@@ -5,17 +5,11 @@ import re
 from urllib.parse import urlparse
 import httpx
 
-
-import os
-
-
 class AntiPhishingDetector:
 
     def __init__(self, json_path="data/dominios.json"):
-        # Correto: Busca o valor real guardado na memória/sistema
+        # Busca a chave cadastrada nas variáveis de ambiente
         self.virustotal_api_key = os.getenv("VIRUSTOTAL_API_KEY", "")
-
-    
 
         self.config = {
             "tlds_suspeitos": [],
@@ -24,7 +18,7 @@ class AntiPhishingDetector:
         }
 
         # Tenta carregar as regras a partir da raiz ou do diretório superior
-        caminhos_busca = [json_path, os.path.join("..", json_path)]
+        caminhos_busca = [json_path, os.path.join("..", json_path), "dominios.json"]
         for caminho in caminhos_busca:
             if os.path.exists(caminho):
                 try:
@@ -68,7 +62,7 @@ class AntiPhishingDetector:
         print(f"🌐 [VirusTotal] Consultando URL na base global: {url}")
 
         try:
-            # O VirusTotal v3 exige a URL convertida em Base64 sem caracteres de preenchimento '='
+            # Converte a URL para Base64 sem caracteres de preenchimento '='
             url_id = (
                 base64.urlsafe_b64encode(url.encode()).decode().strip("=")
             )
@@ -101,13 +95,16 @@ class AntiPhishingDetector:
                     f"🛡️ [VirusTotal] Motores: {maliciosos} Maliciosos | {suspeitos} Suspeitos | {inofensivos} Inofensivos"
                 )
 
-                # Se 1 ou mais motores/antivírus globais sinalizarem como malicioso
-                if maliciosos > 0:
+                if maliciosos > 0 or suspeitos > 0:
                     return True
 
             elif response.status_code == 404:
                 print(
-                    "ℹ️ [VirusTotal] URL ainda não foi catalogada na base do VirusTotal."
+                    "ℹ️ [VirusTotal] URL ainda não foi catalogada. Seguindo apenas com regras heurísticas locais."
+                )
+            else:
+                print(
+                    f"⚠️ [VirusTotal] Falha na consulta (Status HTTP {response.status_code})."
                 )
 
         except Exception as e:
@@ -141,9 +138,9 @@ class AntiPhishingDetector:
             # 0. CONSULTA EM TEMPO REAL VIA VIRUSTOTAL
             # ---------------------------------------------------------
             if self.consultar_virustotal(link):
-                score = 100
+                score += 80
                 motivos.append(
-                    "🚨 URL confirmada como maliciosa pela base de dados global do VirusTotal"
+                    "🚨 URL confirmada como maliciosa/suspeita pela base global do VirusTotal"
                 )
 
             parsed_url = urlparse(link)
@@ -167,7 +164,7 @@ class AntiPhishingDetector:
                     motivos.append(f"Termo suspeito detectado: '{palavra}'")
 
             # ---------------------------------------------------------
-            # C. IMITAÇÃO DE MARCAS DO JSON
+            # C. IMITAÇÃO DE MARCAS DO JSON (Subdomínios / Phishing de Marca)
             # ---------------------------------------------------------
             for marca, dominios_validos in self.config.get(
                 "dominios_oficiais", {}
@@ -215,7 +212,7 @@ class AntiPhishingDetector:
                 score += 25
                 motivos.append("Domínio com excesso de hífens")
 
-            # Trava o score em 100
+            # Trava o score máximo em 100
             score = min(score, 100)
 
             if score > maior_score:
@@ -238,8 +235,8 @@ class AntiPhishingDetector:
 if __name__ == "__main__":
     detector = AntiPhishingDetector()
 
-    # Exemplo de teste com um site legítimo e famoso
-    mensagem_teste = "Olá! Acesse o site do Google para pesquisar: https://google.com ou teste esse golpe: http://mercadopago-falso.online"
+    # Teste combinando link falso + VirusTotal
+    mensagem_teste = "Acesse: https://mercadolivre.security.com para ver sua promoção!"
 
     print("\n---------------------------------------------------------")
     print("🚀 INICIANDO TESTE DO SHIELDGUARD + VIRUSTOTAL")

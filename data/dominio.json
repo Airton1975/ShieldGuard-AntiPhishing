@@ -1,9 +1,9 @@
 {
   "tlds_suspeitos": [
-    ".digital", ".top", ".xyz", ".site", ".online", ".info", ".work", ".click", ".shop", ".live", ".tech", ".club", ".app", ".store"
+    ".digital", ".top", ".xyz", ".site", ".online", ".info", ".work", ".click", ".shop", ".live", ".tech", ".club", ".app", ".store", ".space", ".website"
   ],
   "palavras_golpe": [
-    "security", "safe", "payment", "bloqueio", "suporte", "verificacao", "atendimento", "protecao", "cancelamento", "urgente", "recadastre", "chave-pix", "estorno", "fatura", "maquininha", "taxa"
+    "security", "safe", "payment", "bloqueio", "suporte", "verificacao", "atendimento", "protecao", "cancelamento", "urgente", "recadastre", "chave-pix", "estorno", "fatura", "maquininha", "taxa", "rastreio", "encomenda", "taxado", "regularizacao", "ipva", "multa", "pontos", "restricao", "irpf", "pendencia"
   ],
   "dominios_oficiais": {
     "ton": ["ton.com.br", "ton.com", "stone.com.br"],
@@ -11,6 +11,8 @@
     "paypal": ["paypal.com", "paypal.com.br", "paypal-communication.com"],
     "mercado pago": ["mercadopago.com.br", "mercadolibre.com", "mercadopago.com"],
     "mercadopago": ["mercadopago.com.br", "mercadolibre.com", "mercadopago.com"],
+    "mercado livre": ["mercadolivre.com.br", "mercadolibre.com"],
+    "mercadolivre": ["mercadolivre.com.br", "mercadolibre.com"],
     "nubank": ["nubank.com.br"],
     "bradesco": ["bradesco.com.br", "bancobradesco.com.br"],
     "itau": ["itau.com.br", "itaubrasil.com.br"],
@@ -25,6 +27,24 @@
     "picpay": ["picpay.com"],
     "cielo": ["cielo.com.br"],
     "sicoob": ["sicoob.com.br"],
-    "sicredi": ["sicredi.com.br"]
+    "sicredi": ["sicredi.com.br"],
+    "mercantil": ["bancomercantil.com.br", "mercantildobrasil.com.br"],
+    "banco mercantil": ["bancomercantil.com.br", "mercantildobrasil.com.br"],
+    
+    "shopee": ["shopee.com.br", "shopee.com"],
+    "amazon": ["amazon.com.br", "amazon.com", "primevideo.com"],
+    "prime": ["amazon.com.br", "primevideo.com"],
+    "prime video": ["primevideo.com", "amazon.com.br"],
+    "globoplay": ["globoplay.globo.com", "globo.com"],
+    "globo": ["globo.com", "globoplay.globo.com"],
+    "netflix": ["netflix.com", "netflix.com.br"],
+    
+    "correios": ["correios.com.br"],
+    "detran": ["detran.sp.gov.br", "detran.rj.gov.br", "detran.mg.gov.br", "gov.br"],
+    "receita federal": ["gov.br", "receita.fazenda.gov.br"],
+    "receita": ["gov.br", "receita.fazenda.gov.br"],
+    "gov.br": ["gov.br"],
+    "gov": ["gov.br"],
+    "serasa": ["serasa.com.br", "serasaconsumidor.com.br"]
   }
 }
