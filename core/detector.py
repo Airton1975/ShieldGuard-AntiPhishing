@@ -9,7 +9,6 @@ import httpx
 class AntiPhishingDetector:
 
     def __init__(self, json_path=None):
-        # Busca a API KEY do ambiente
         self.virustotal_api_key = os.getenv("VIRUSTOTAL_API_KEY", "")
 
         self.config = {
@@ -18,8 +17,7 @@ class AntiPhishingDetector:
             "dominios_oficiais": {},
         }
 
-        # RESOLUÇÃO DE CAMINHO ABSOLUTO PARA O RENDER
-        # Pega a pasta onde o detector.py está (ex: /app/core) e sobe um nível para achar /app/data/dominio.json
+        # RESOLUÇÃO DE CAMINHO ABSOLUTO (Evita falhas de pasta no Render)
         diretorio_atual = os.path.dirname(os.path.abspath(__file__))
         caminho_absoluto_json = os.path.abspath(
             os.path.join(diretorio_atual, "..", "data", "dominio.json")
@@ -38,10 +36,12 @@ class AntiPhishingDetector:
                 try:
                     with open(caminho, "r", encoding="utf-8") as f:
                         self.config = json.load(f)
-                    print(f"✅ [ShieldGuard] Regras carregadas com sucesso de: '{caminho}'")
+                    print(f"✅ [ShieldGuard] Base de domínios/regras carregada com sucesso de: '{caminho}'")
                     break
                 except Exception as e:
                     print(f"⚠️ [ShieldGuard] Erro ao ler JSON em {caminho}: {e}")
+            else:
+                print(f"🔍 [ShieldGuard] Arquivo não encontrado em: {caminho}")
 
         self.encurtadores = [
             "bit.ly", "tinyurl.com", "cutt.ly", "is.gd", "t.co", "rebrand.ly"
@@ -53,15 +53,15 @@ class AntiPhishingDetector:
         ]
 
     def normalizar_texto(self, texto: str) -> str:
-        """Remove caracteres repetidos consecutivamente."""
+        """Remove repetições de letras consecutivos para conter typosquatting."""
         return re.sub(r'(.)\1+', r'\1', texto.lower())
 
     def consultar_virustotal(self, url: str) -> bool:
         if not self.virustotal_api_key:
-            print("⚠️ [VirusTotal] Chave VIRUSTOTAL_API_KEY não configurada no ambiente.")
+            print("⚠️ [VirusTotal] Chave VIRUSTOTAL_API_KEY não encontrada.")
             return False
 
-        print(f"🌐 [VirusTotal] Consultando URL: {url}")
+        print(f"🌐 [VirusTotal] Consultando URL na base global: {url}")
 
         try:
             url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
@@ -71,9 +71,8 @@ class AntiPhishingDetector:
                 "accept": "application/json",
             }
 
-            # Timeout reduzido para 3 segundos para evitar estourar o tempo da Z-API
             response = httpx.get(endpoint, headers=headers, timeout=3.0)
-            print(f"📊 [VirusTotal] Status HTTP: {response.status_code}")
+            print(f"📊 [VirusTotal] Status da Resposta: HTTP {response.status_code}")
 
             if response.status_code == 200:
                 data = response.json()
@@ -85,17 +84,14 @@ class AntiPhishingDetector:
                     return True
 
             elif response.status_code == 404:
-                print("ℹ️ [VirusTotal] URL não catalogada na base global.")
+                print("ℹ️ [VirusTotal] URL não catalogada na base global. Seguindo com heurística local.")
 
-        except httpx.TimeoutException:
-            print("⏳ [VirusTotal] Tempo limite atingido (Timeout). Seguindo com análise local...")
         except Exception as e:
-            print(f"⚠️ [VirusTotal] Erro de conexão: {e}")
+            print(f"⚠️ [VirusTotal] Erro/Timeout na consulta: {e}")
 
         return False
 
     def extrair_links(self, texto: str):
-        # Suporta links digitados com ou sem protocolo http/https
         regex_url = r"(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?"
         links = re.findall(regex_url, texto)
         
@@ -126,32 +122,46 @@ class AntiPhishingDetector:
             score = 0
             motivos = []
 
-            # 1. VIRUSTOTAL
+            # ---------------------------------------------------------
+            # 0. CONSULTA VIRUSTOTAL
+            # ---------------------------------------------------------
             if self.consultar_virustotal(link):
                 score += 80
-                motivos.append("🚨 URL confirmada como maliciosa/suspeita pela base global do VirusTotal")
+                motivos.append("🚨 URL confirmada como maliciosa pela base global do VirusTotal")
 
             parsed_url = urlparse(link)
             dominio = parsed_url.netloc.lower()
             dominio_normalizado = self.normalizar_texto(dominio)
 
-            # A. TLDs SUSPEITOS (.digital, .xyz, etc)
+            # ---------------------------------------------------------
+            # A. CHECAGEM DE TLDs SUSPEITOS (.digital, .xyz, etc)
+            # ---------------------------------------------------------
             for tld in self.config.get("tlds_suspeitos", []):
                 if dominio.endswith(tld):
                     score += 35
                     motivos.append(f"Uso de TLD de risco: '{tld}'")
                     break
 
-            # B. PALAVRAS DE GOLPE
+            # ---------------------------------------------------------
+            # B. CHECAGEM DE PALAVRAS DE GOLPE
+            # ---------------------------------------------------------
             for palavra in self.config.get("palavras_golpe", []):
                 if palavra in dominio or palavra in dominio_normalizado or palavra in texto_lower:
                     score += 20
                     motivos.append(f"Termo suspeito detectado: '{palavra}'")
 
+            # ---------------------------------------------------------
             # C. IMITAÇÃO DE MARCAS
+            # ---------------------------------------------------------
             for marca, dominios_validos in self.config.get("dominios_oficiais", {}).items():
-                marca_norm = self.normalizar_texto(marca)
-                if marca in texto_lower or marca in dominio or marca_norm in dominio_normalizado:
+                marca_sem_espaco = marca.replace(" ", "")
+                marca_norm = self.normalizar_texto(marca_sem_espaco)
+
+                # Verifica se a marca aparece no texto ou no domínio
+                if (marca in texto_lower or 
+                    marca_sem_espaco in dominio or 
+                    marca_norm in dominio_normalizado):
+                    
                     e_oficial = any(
                         dominio == d or dominio.endswith("." + d)
                         for d in dominios_validos
@@ -161,7 +171,9 @@ class AntiPhishingDetector:
                         motivos.append(f"Tentativa de imitação da marca/instituição '{marca.title()}' em domínio não oficial")
                         break
 
-            # D. CONTEXTO FINANCEIRO
+            # ---------------------------------------------------------
+            # D. CONTEXTO FINANCEIRO E TLD SEGURO
+            # ---------------------------------------------------------
             tem_contexto_financeiro = any(termo in texto_lower for termo in self.termos_financeiros)
             e_dominio_br = dominio.endswith(".com.br") or dominio.endswith(".gov.br")
 
@@ -169,7 +181,9 @@ class AntiPhishingDetector:
                 score += 40
                 motivos.append("Mensagem com contexto financeiro direcionando para domínio fora do padrão seguro (.com.br/.gov.br)")
 
+            # ---------------------------------------------------------
             # E. ESTRUTURA DA URL
+            # ---------------------------------------------------------
             if re.search(r"https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", link):
                 score += 65
                 motivos.append("Uso de IP direto no link")
