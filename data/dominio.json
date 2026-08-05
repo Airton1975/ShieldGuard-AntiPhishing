@@ -1,0 +1,30 @@
+{
+  "tlds_suspeitos": [
+    ".digital", ".top", ".xyz", ".site", ".online", ".info", ".work", ".click", ".shop", ".live", ".tech", ".club", ".app", ".store"
+  ],
+  "palavras_golpe": [
+    "security", "safe", "payment", "bloqueio", "suporte", "verificacao", "atendimento", "protecao", "cancelamento", "urgente", "recadastre", "chave-pix", "estorno", "fatura", "maquininha", "taxa"
+  ],
+  "dominios_oficiais": {
+    "ton": ["ton.com.br", "ton.com", "stone.com.br"],
+    "stone": ["stone.com.br", "ton.com.br"],
+    "paypal": ["paypal.com", "paypal.com.br", "paypal-communication.com"],
+    "mercado pago": ["mercadopago.com.br", "mercadolibre.com", "mercadopago.com"],
+    "mercadopago": ["mercadopago.com.br", "mercadolibre.com", "mercadopago.com"],
+    "nubank": ["nubank.com.br"],
+    "bradesco": ["bradesco.com.br", "bancobradesco.com.br"],
+    "itau": ["itau.com.br", "itaubrasil.com.br"],
+    "caixa": ["caixa.gov.br"],
+    "santander": ["santander.com.br"],
+    "banco do brasil": ["bb.com.br"],
+    "bb": ["bb.com.br"],
+    "inter": ["bancinter.com.br", "inter.co"],
+    "c6": ["c6bank.com.br", "c6bank.app"],
+    "pagbank": ["pagbank.com.br", "pagseguro.uol.com.br"],
+    "pagseguro": ["pagseguro.uol.com.br", "pagbank.com.br"],
+    "picpay": ["picpay.com"],
+    "cielo": ["cielo.com.br"],
+    "sicoob": ["sicoob.com.br"],
+    "sicredi": ["sicredi.com.br"]
+  }
+}
