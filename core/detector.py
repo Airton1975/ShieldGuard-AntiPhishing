@@ -96,7 +96,6 @@ class AntiPhishingDetector:
 
     def consultar_registro_br(self, dominio: str):
         """Consulta a API oficial RDAP do Registro.br para domínios .br."""
-        # Se o domínio começa com www., remove para a busca no RDAP
         dominio_limpo = re.sub(r'^www\.', '', dominio)
         
         if not dominio_limpo.endswith(".br"):
@@ -109,10 +108,9 @@ class AntiPhishingDetector:
             response = httpx.get(url_rdap, timeout=3.0)
 
             if response.status_code == 404:
-                # Domínio .br inexistente/não registrado oficialmente!
                 return {
                     "existe": False,
-                    "motivo": "Domínio .br não está registrado no Registro.br (possível link falso/fantasma)"
+                    "motivo": "Domínio .br não está registrado no Registro.br"
                 }
 
             if response.status_code == 200:
@@ -127,7 +125,6 @@ class AntiPhishingDetector:
 
                 dias_existencia = None
                 if data_criacao_str:
-                    # Parse da data de criação ISO-8601
                     data_criacao = datetime.fromisoformat(data_criacao_str.replace("Z", "+00:00"))
                     agora = datetime.now(timezone.utc)
                     dias_existencia = (agora - data_criacao).days
@@ -233,16 +230,25 @@ class AntiPhishingDetector:
                     motivos.append(f"Termo suspeito detectado: '{palavra}'")
 
             # ---------------------------------------------------------
-            # C. IMITAÇÃO DE MARCAS
+            # C. IMITAÇÃO DE MARCAS (Com proteção para marcas curtas <= 3 letras)
             # ---------------------------------------------------------
             for marca, dominios_validos in self.config.get("dominios_oficiais", {}).items():
                 marca_sem_espaco = marca.replace(" ", "")
                 marca_norm = self.normalizar_texto(marca_sem_espaco)
 
-                if (marca in texto_lower or
-                    marca_sem_espaco in dominio or
-                    marca_norm in dominio_normalizado):
+                if len(marca_sem_espaco) <= 3:
+                    # Marca curta (ex: "bb", "c6"): Exige correspondência exata de palavra isolada ou bloco de domínio
+                    match_dominio = bool(re.search(r'(^|[\.\-])' + re.escape(marca_sem_espaco) + r'([\.\-]|$)', dominio))
+                    match_texto = bool(re.search(r'\b' + re.escape(marca) + r'\b', texto_lower))
+                    marca_detectada = match_dominio or match_texto
+                else:
+                    marca_detectada = (
+                        marca in texto_lower or
+                        marca_sem_espaco in dominio or
+                        marca_norm in dominio_normalizado
+                    )
 
+                if marca_detectada:
                     e_oficial = any(
                         dominio == d or dominio.endswith("." + d)
                         for d in dominios_validos
