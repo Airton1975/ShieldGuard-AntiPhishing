@@ -1,3 +1,8 @@
+# ==============================================================================
+# ShieldGuard - Sistema de Gestão e Proteção Antiphishing
+# Copyright (c) 2026 Airton Luis Barboza. Todos os direitos reservados.
+# ==============================================================================
+
 import base64
 from datetime import datetime, timezone
 import json

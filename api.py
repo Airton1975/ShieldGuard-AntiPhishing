@@ -1,3 +1,8 @@
+# ==============================================================================
+# ShieldGuard - API Webhook para WhatsApp e Antiphishing
+# Copyright (c) 2026 Airton Luis Barboza. Todos os direitos reservados.
+# ==============================================================================
+
 import os
 from dotenv import load_dotenv
 
