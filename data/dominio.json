@@ -38,6 +38,9 @@
     "globoplay": ["globoplay.globo.com", "globo.com"],
     "globo": ["globo.com", "globoplay.globo.com"],
     "netflix": ["netflix.com", "netflix.com.br"],
+    "casasbahia": ["casasbahia.com", "casasbahia.com.br"],
+    "carrefour": ["carrefour.com", "carrefour.com.br"],
+    "magazineluiza": ["magazineluiza.com", "magazineluiza.com.br"],
     
     "correios": ["correios.com.br"],
     "detran": ["detran.sp.gov.br", "detran.rj.gov.br", "detran.mg.gov.br", "gov.br"],
@@ -46,5 +49,7 @@
     "gov.br": ["gov.br"],
     "gov": ["gov.br"],
     "serasa": ["serasa.com.br", "serasaconsumidor.com.br"]
+    
+
   }
 }

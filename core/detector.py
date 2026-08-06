@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -17,7 +18,7 @@ class AntiPhishingDetector:
             "dominios_oficiais": {},
         }
 
-        # RESOLUÇÃO DE CAMINHO ABSOLUTO (Evita falhas de pasta no Render)
+        # RESOLUÇÃO DE CAMINHO ABSOLUTO PARA O RENDER
         diretorio_atual = os.path.dirname(os.path.abspath(__file__))
         caminho_absoluto_json = os.path.abspath(
             os.path.join(diretorio_atual, "..", "data", "dominio.json")
@@ -36,12 +37,10 @@ class AntiPhishingDetector:
                 try:
                     with open(caminho, "r", encoding="utf-8") as f:
                         self.config = json.load(f)
-                    print(f"✅ [ShieldGuard] Base de domínios/regras carregada com sucesso de: '{caminho}'")
+                    print(f"✅ [ShieldGuard] Base de regras carregada de: '{caminho}'")
                     break
                 except Exception as e:
                     print(f"⚠️ [ShieldGuard] Erro ao ler JSON em {caminho}: {e}")
-            else:
-                print(f"🔍 [ShieldGuard] Arquivo não encontrado em: {caminho}")
 
         self.encurtadores = [
             "bit.ly", "tinyurl.com", "cutt.ly", "is.gd", "t.co", "rebrand.ly"
@@ -52,8 +51,13 @@ class AntiPhishingDetector:
             "extrato", "fatura", "saldo", "cartao", "credito", "militar", "consignado"
         ]
 
+        self.termos_servicos_nacionais = [
+            "pix", "receita", "fgts", "serasa", "detran", "correios", "gov",
+            "caixa", "bb", "bradesco", "itau", "santander", "multa", "ipva", "cpf", "inss"
+        ]
+
     def normalizar_texto(self, texto: str) -> str:
-        """Remove repetições de letras consecutivos para conter typosquatting."""
+        """Remove repetições consecutivas de letras para conter typosquatting."""
         return re.sub(r'(.)\1+', r'\1', texto.lower())
 
     def consultar_virustotal(self, url: str) -> bool:
@@ -72,7 +76,6 @@ class AntiPhishingDetector:
             }
 
             response = httpx.get(endpoint, headers=headers, timeout=3.0)
-            print(f"📊 [VirusTotal] Status da Resposta: HTTP {response.status_code}")
 
             if response.status_code == 200:
                 data = response.json()
@@ -84,24 +87,73 @@ class AntiPhishingDetector:
                     return True
 
             elif response.status_code == 404:
-                print("ℹ️ [VirusTotal] URL não catalogada na base global. Seguindo com heurística local.")
+                print("ℹ️ [VirusTotal] URL não catalogada na base global.")
 
         except Exception as e:
             print(f"⚠️ [VirusTotal] Erro/Timeout na consulta: {e}")
 
         return False
 
+    def consultar_registro_br(self, dominio: str):
+        """Consulta a API oficial RDAP do Registro.br para domínios .br."""
+        # Se o domínio começa com www., remove para a busca no RDAP
+        dominio_limpo = re.sub(r'^www\.', '', dominio)
+        
+        if not dominio_limpo.endswith(".br"):
+            return None
+
+        url_rdap = f"https://rdap.registro.br/domain/{dominio_limpo}"
+        print(f"🇧🇷 [Registro.br RDAP] Consultando: {dominio_limpo}")
+
+        try:
+            response = httpx.get(url_rdap, timeout=3.0)
+
+            if response.status_code == 404:
+                # Domínio .br inexistente/não registrado oficialmente!
+                return {
+                    "existe": False,
+                    "motivo": "Domínio .br não está registrado no Registro.br (possível link falso/fantasma)"
+                }
+
+            if response.status_code == 200:
+                data = response.json()
+                events = data.get("events", [])
+                data_criacao_str = None
+
+                for event in events:
+                    if event.get("eventAction") == "registration":
+                        data_criacao_str = event.get("eventDate")
+                        break
+
+                dias_existencia = None
+                if data_criacao_str:
+                    # Parse da data de criação ISO-8601
+                    data_criacao = datetime.fromisoformat(data_criacao_str.replace("Z", "+00:00"))
+                    agora = datetime.now(timezone.utc)
+                    dias_existencia = (agora - data_criacao).days
+
+                return {
+                    "existe": True,
+                    "dias_existencia": dias_existencia,
+                    "handle": data.get("handle")
+                }
+
+        except Exception as e:
+            print(f"⚠️ [Registro.br RDAP] Falha na consulta: {e}")
+
+        return None
+
     def extrair_links(self, texto: str):
         regex_url = r"(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?"
         links = re.findall(regex_url, texto)
-        
+
         links_formatados = []
         for l in links:
             if not l.startswith("http://") and not l.startswith("https://"):
                 links_formatados.append("https://" + l)
             else:
                 links_formatados.append(l)
-                
+
         return links_formatados
 
     def analisar_mensagem(self, texto: str):
@@ -123,7 +175,7 @@ class AntiPhishingDetector:
             motivos = []
 
             # ---------------------------------------------------------
-            # 0. CONSULTA VIRUSTOTAL
+            # 0. VIRUSTOTAL
             # ---------------------------------------------------------
             if self.consultar_virustotal(link):
                 score += 80
@@ -134,7 +186,37 @@ class AntiPhishingDetector:
             dominio_normalizado = self.normalizar_texto(dominio)
 
             # ---------------------------------------------------------
-            # A. CHECAGEM DE TLDs SUSPEITOS (.digital, .xyz, etc)
+            # 1. VALIDAÇÃO REGISTRO.BR (RDAP) PARA DOMÍNIOS .BR
+            # ---------------------------------------------------------
+            dados_registro_br = self.consultar_registro_br(dominio)
+            if dados_registro_br:
+                if not dados_registro_br["existe"]:
+                    score += 70
+                    motivos.append("🚨 Domínio .br não existe no banco oficial do Registro.br")
+                elif dados_registro_br.get("dias_existencia") is not None:
+                    dias = dados_registro_br["dias_existencia"]
+                    if dias < 30:
+                        score += 50
+                        motivos.append(f"⚠️ Domínio registrado recentemente no Brasil (há apenas {dias} dias)")
+
+            # ---------------------------------------------------------
+            # 2. ALERTA DE DOMÍNIO NÃO NACIONAL PARA SERVIÇOS DO BRASIL
+            # ---------------------------------------------------------
+            tem_servico_br = any(t in texto_lower or t in dominio for t in self.termos_servicos_nacionais)
+            e_dominio_br = dominio.endswith(".br")
+
+            if tem_servico_br and not e_dominio_br:
+                dominios_globais_autorizados = [
+                    "shopee.com", "amazon.com", "netflix.com", "paypal.com", "google.com"
+                ]
+                e_global_autorizado = any(dominio == d or dominio.endswith("." + d) for d in dominios_globais_autorizados)
+
+                if not e_global_autorizado:
+                    score += 45
+                    motivos.append("⚠️ Serviço/Instituição brasileira direcionando para domínio internacional não oficial (fora do padrão .br/.gov.br)")
+
+            # ---------------------------------------------------------
+            # A. TLDs SUSPEITOS (.digital, .xyz, etc)
             # ---------------------------------------------------------
             for tld in self.config.get("tlds_suspeitos", []):
                 if dominio.endswith(tld):
@@ -143,7 +225,7 @@ class AntiPhishingDetector:
                     break
 
             # ---------------------------------------------------------
-            # B. CHECAGEM DE PALAVRAS DE GOLPE
+            # B. PALAVRAS DE GOLPE
             # ---------------------------------------------------------
             for palavra in self.config.get("palavras_golpe", []):
                 if palavra in dominio or palavra in dominio_normalizado or palavra in texto_lower:
@@ -157,11 +239,10 @@ class AntiPhishingDetector:
                 marca_sem_espaco = marca.replace(" ", "")
                 marca_norm = self.normalizar_texto(marca_sem_espaco)
 
-                # Verifica se a marca aparece no texto ou no domínio
-                if (marca in texto_lower or 
-                    marca_sem_espaco in dominio or 
+                if (marca in texto_lower or
+                    marca_sem_espaco in dominio or
                     marca_norm in dominio_normalizado):
-                    
+
                     e_oficial = any(
                         dominio == d or dominio.endswith("." + d)
                         for d in dominios_validos
@@ -172,18 +253,13 @@ class AntiPhishingDetector:
                         break
 
             # ---------------------------------------------------------
-            # D. CONTEXTO FINANCEIRO E TLD SEGURO
+            # D. CONTEXTO FINANCEIRO E ESTRUTURA
             # ---------------------------------------------------------
             tem_contexto_financeiro = any(termo in texto_lower for termo in self.termos_financeiros)
-            e_dominio_br = dominio.endswith(".com.br") or dominio.endswith(".gov.br")
-
             if tem_contexto_financeiro and not e_dominio_br:
-                score += 40
-                motivos.append("Mensagem com contexto financeiro direcionando para domínio fora do padrão seguro (.com.br/.gov.br)")
+                score += 30
+                motivos.append("Mensagem com contexto financeiro direcionando para domínio fora do padrão seguro nacional")
 
-            # ---------------------------------------------------------
-            # E. ESTRUTURA DA URL
-            # ---------------------------------------------------------
             if re.search(r"https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", link):
                 score += 65
                 motivos.append("Uso de IP direto no link")
