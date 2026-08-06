@@ -56,6 +56,12 @@ class AntiPhishingDetector:
             "caixa", "bb", "bradesco", "itau", "santander", "multa", "ipva", "cpf", "inss"
         ]
 
+        # FALLBACK INTERNO DE TERMOS DE SEGURANÇA E ALERTA CRÍTICO
+        self.termos_criticos_alerta = [
+            "fraude", "golpe", "phishing", "clonado", "fake", "hack",
+            "bloqueio", "suporte", "seguranca", "segurança", "atendimento"
+        ]
+
     def normalizar_texto(self, texto: str) -> str:
         """Remove repetições consecutivas de letras para conter typosquatting."""
         return re.sub(r'(.)\1+', r'\1', texto.lower())
@@ -213,6 +219,15 @@ class AntiPhishingDetector:
                     motivos.append("⚠️ Serviço/Instituição brasileira direcionando para domínio internacional não oficial (fora do padrão .br/.gov.br)")
 
             # ---------------------------------------------------------
+            # 3. VERIFICAÇÃO DE TERMOS CRÍTICOS (FALLBACK INTERNO)
+            # ---------------------------------------------------------
+            for termo_critico in self.termos_criticos_alerta:
+                if termo_critico in dominio or termo_critico in texto_lower:
+                    score += 35
+                    motivos.append(f"Termo suspeito/alerta de segurança detectado: '{termo_critico}'")
+                    break
+
+            # ---------------------------------------------------------
             # A. TLDs SUSPEITOS (.digital, .xyz, etc)
             # ---------------------------------------------------------
             for tld in self.config.get("tlds_suspeitos", []):
@@ -222,12 +237,14 @@ class AntiPhishingDetector:
                     break
 
             # ---------------------------------------------------------
-            # B. PALAVRAS DE GOLPE
+            # B. PALAVRAS DE GOLPE DO DOMINIO.JSON
             # ---------------------------------------------------------
             for palavra in self.config.get("palavras_golpe", []):
                 if palavra in dominio or palavra in dominio_normalizado or palavra in texto_lower:
-                    score += 20
-                    motivos.append(f"Termo suspeito detectado: '{palavra}'")
+                    # Evita duplicar pontuação caso já tenha pego no termo crítico
+                    if not any(palavra in m for m in motivos):
+                        score += 20
+                        motivos.append(f"Termo suspeito detectado: '{palavra}'")
 
             # ---------------------------------------------------------
             # C. IMITAÇÃO DE MARCAS (Com proteção para marcas curtas <= 3 letras)
