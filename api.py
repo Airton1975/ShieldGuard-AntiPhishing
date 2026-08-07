@@ -18,11 +18,10 @@ router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Webhook"])
 detector = AntiPhishingDetector()
 
 # ---------------------------------------------------------
-# CREDENCIAIS DA Z-API (Lidas com segurança do arquivo .env)
+# CREDENCIAIS DA ZAP-API (Atualizado para a nova versão)
 # ---------------------------------------------------------
 ZAPI_INSTANCE_ID = os.getenv("ZAPI_INSTANCE_ID", "")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN", "")
-ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN", "")
 
 
 @router.post("/webhook")
@@ -95,11 +94,12 @@ async def whatsapp_webhook(payload: dict):
             for motivo in link.get("motivos", []):
                 resposta_zap += f"• {motivo}\n"
 
-    # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA Z-API
-    url_envio = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
+    # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA ZAP-API
+    # URL e Headers adaptados para o padrão da nova API
+    url_envio = f"https://api.zap-api.tech/instances/{ZAPI_INSTANCE_ID}/messages/send-text"
 
     headers = {
-        "Client-Token": ZAPI_CLIENT_TOKEN,
+        "Authorization": f"Bearer {ZAPI_TOKEN}",
         "Content-Type": "application/json",
     }
 
@@ -110,9 +110,9 @@ async def whatsapp_webhook(payload: dict):
             response = await client.post(
                 url_envio, json=body, headers=headers, timeout=5.0
             )
-            print(f"\n⚡ Status do Envio Z-API: {response.status_code}\n")
+            print(f"\n⚡ Status do Envio ZAP-API: {response.status_code} - Resposta: {response.text}\n")
     except Exception as e:
-        print("Erro ao enviar mensagem via Z-API:", e)
+        print("Erro ao enviar mensagem via ZAP-API:", e)
 
     return {
         "remetente": remetente,

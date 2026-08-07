@@ -1,0 +1,1 @@
+web: gunicorn gunicorn.conf.py main:app
