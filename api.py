@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import httpx
-from fastapi import FastAPI
-import uvicorn
+from fastapi import APIRouter
 from core.detector import AntiPhishingDetector
 
-app = FastAPI(title="ShieldGuard WhatsApp Webhook")
+# Define como APIRouter para unificar com o main.py
+router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Webhook"])
 detector = AntiPhishingDetector()
 
 # ---------------------------------------------------------
@@ -25,14 +25,9 @@ ZAPI_TOKEN = os.getenv("ZAPI_TOKEN", "")
 ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN", "")
 
 
-@app.get("/")
-def home():
-    return {"status": "ShieldGuard API está online e pronta!"}
-
-
-@app.post("/webhook/whatsapp")
+@router.post("/webhook")
 async def whatsapp_webhook(payload: dict):
-    print("\n📩 Mensagem recebida via Webhook:", payload)
+    print("\n📩 Mensagem recebida via Webhook do WhatsApp:", payload)
 
     # 1. Extração do remetente
     remetente = payload.get("phone") or payload.get("connectedPhone") or ""
@@ -56,7 +51,7 @@ async def whatsapp_webhook(payload: dict):
         return {"status": "Mensagem vazia ignorada."}
 
     # 3. EVITA LOOP INFINITO: Ignora mensagens geradas pelo próprio robô
-    if "ShieldGuard" in texto_mensagem:
+    if "ShieldGuard" in texto_mensagem or "GOLPE DETECTADO" in texto_mensagem:
         return {"status": "Mensagem do próprio ShieldGuard ignorada."}
 
     # 🛑 TRAVA DEFINITIVA: Se a mensagem NÃO contiver "http" (links), ignora na hora!
@@ -73,38 +68,32 @@ async def whatsapp_webhook(payload: dict):
         print("🟢 Ignorado: Nenhum risco/link detectado pelo motor.")
         return {"status": "Ignorado: sem risco."}
 
-    # 5. Montagem da resposta
+    # 5. MONTAGEM DA RESPOSTA COM UX DIRETA (ALERTA NO TOPO + PHISHING)
     if score >= 60:
         resposta_zap = (
-            f"🚨 *ALERTA DE SEGURANÇA - SHIELDGUARD* 🚨\n\n"
-            f"🔴 Cuidado! Esta mensagem possui *ALTO RISCO DE GOLPE / PHISHING*.\n\n"
-            f"📊 *Score de Risco:* {score}/100\n\n"
-            f"🔍 *Evidências Detectadas:*\n"
+            "🚨 *ALERTA: GOLPE DETECTADO!* _(Phishing)_\n"
+            f"🔴 *NÍVEL DE PERIGO:* ALTO ({score}/100)\n\n"
+            "🛡️ *RECOMENDAÇÃO:* *NÃO CLIQUE NO LINK* e *NÃO ENVIE SEUS DADOS*!\n"
+            "___________________________________\n\n"
+            "🔍 *Por que esta mensagem é suspeita?*\n"
         )
         for link in links_analisados:
             for motivo in link.get("motivos", []):
                 resposta_zap += f"• {motivo}\n"
 
-        resposta_zap += (
-            "\n⛔ *Recomendação:* Não clique no link e não forneça senhas nem"
-            " dados pessoais."
-        )
+        resposta_zap += "\n💡 _Bloqueie o remetente e apague a mensagem por segurança._"
 
     else:
         resposta_zap = (
-            f"⚠️ *ATENÇÃO - MENSAGEM SUSPEITA* ⚠️\n\n"
-            f"O ShieldGuard identificou padrões suspeitos nesta mensagem.\n\n"
-            f"📊 *Score de Risco:* {score}/100\n\n"
-            f"🔍 *Evidências Detectadas:*\n"
+            "⚠️ *ATENÇÃO: MENSAGEM COM SUSPEITA LEVE*\n"
+            f"🟡 *NÍVEL DE PERIGO:* MÉDIO/BAIXO ({score}/100)\n\n"
+            "🛡️ *RECOMENDAÇÃO:* Verifique a fonte antes de clicar.\n"
+            "___________________________________\n\n"
+            "🔍 *Evidências Detectadas:*\n"
         )
         for link in links_analisados:
             for motivo in link.get("motivos", []):
                 resposta_zap += f"• {motivo}\n"
-
-        resposta_zap += (
-            "\n🟡 *Recomendação:* Verifique a autenticidade da fonte antes de"
-            " acessar qualquer link."
-        )
 
     # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA Z-API
     url_envio = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
@@ -130,7 +119,3 @@ async def whatsapp_webhook(payload: dict):
         "diagnostico": resultado.get("status", "ANALISADO"),
         "resposta_whatsapp": resposta_zap,
     }
-
-
-if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,41 +1,37 @@
 # ==============================================================================
-# ShieldGuard - Script Principal de Testes CLI
+# ShieldGuard - API & Motor Central AntiPhishing
 # Copyright (c) 2026 Airton Luis Barboza. Todos os direitos reservados.
 # ==============================================================================
 
+import uvicorn
+from fastapi import FastAPI
 from core.detector import AntiPhishingDetector
+from routers import gmail  # Importa o módulo de e-mail
+import api as whatsapp_router  # Importa o módulo do WhatsApp
+
+# 1. Instância do servidor FastAPI
+app = FastAPI(
+    title="ShieldGuard AntiPhishing API",
+    description="Motor de Inteligência e Proteção contra Golpes em E-mails, WhatsApp e URLs.",
+    version="1.0.0"
+)
+
+# 2. Registro dos Routers (Rotas Unificadas da API)
+app.include_router(gmail.router)
+app.include_router(whatsapp_router.router)  # <--- HABILITA O WHATSAPP NO SERVIDOR CENTRAL!
 
 
-def main():
-    detector = AntiPhishingDetector()
-
-    print("=" * 60)
-    print("🛡️  SHIELDGUARD - DETECTOR DE PHISHING E GOLPES DE MERCADO")
-    print("=" * 60)
-
-    # Caso real do golpe do Mercado Pago
-    mensagem_teste = (
-        "Mercado Pago: Prezado cliente, identificamos um acesso suspeito. "
-        "Valide suas credenciais para evitar o bloqueio da conta: "
-        "http://securitypaymentsafe.digital/login"
-    )
-
-    print("\n📩 Mensagem Recebida para Análise:")
-    print(f'"{mensagem_teste}"\n')
-
-    resultado = detector.analisar_mensagem(mensagem_teste)
-
-    print("-" * 60)
-    print(f"DIAGNÓSTICO: {resultado['status']}")
-    print(f"SCORE DE RISCO: {resultado['maior_score']}/100")
-    print("-" * 60)
-
-    for link_info in resultado["links_analisados"]:
-        print(f"\n🔗 Link: {link_info.get('link', link_info.get('url_analisada'))}")
-        print("🔍 Evidências Encontradas:")
-        for motivo in link_info["motivos"]:
-            print(f"  • {motivo}")
+@app.get("/")
+def home():
+    """Endpoint de boas-vindas e verificação de status da API."""
+    return {
+        "status": "online",
+        "service": "ShieldGuard AntiPhishing API",
+        "author": "Airton Luis Barboza",
+        "docs_url": "/docs"
+    }
 
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Iniciando o Servidor ShieldGuard API...")
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
