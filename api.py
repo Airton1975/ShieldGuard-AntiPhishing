@@ -18,7 +18,7 @@ router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Webhook"])
 detector = AntiPhishingDetector()
 
 # ---------------------------------------------------------
-# CREDENCIAIS DA ZAP-API (Atualizado para a nova versão)
+# CREDENCIAIS DA ZAP-API
 # ---------------------------------------------------------
 ZAPI_INSTANCE_ID = os.getenv("ZAPI_INSTANCE_ID", "")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN", "")
@@ -28,29 +28,51 @@ ZAPI_TOKEN = os.getenv("ZAPI_TOKEN", "")
 async def whatsapp_webhook(payload: dict):
     print("\n📩 Mensagem recebida via Webhook do WhatsApp:", payload)
 
-    # 1. Extração do remetente
-    remetente = payload.get("phone") or payload.get("connectedPhone") or ""
+    # 1. Extração robusta do remetente (suportando mensagens enviadas por você ou por outros)
+    remetente = ""
+    data = payload.get("data", {})
+    
+    if isinstance(data, dict):
+        remetente = data.get("phone") or data.get("participant") or ""
+    
+    if not remetente:
+        remetente = payload.get("phone") or payload.get("connectedPhone") or ""
+        
     if not remetente and "chatId" in payload:
         remetente = str(payload["chatId"]).split("@")[0]
+        
+    if not remetente and isinstance(data, dict) and "chatId" in data:
+        remetente = str(data["chatId"]).split("@")[0]
 
-    # 2. Extração do texto da mensagem
+    # 2. Extração segura do texto da mensagem
     texto_mensagem = ""
 
-    if isinstance(payload.get("text"), dict):
-        texto_mensagem = payload["text"].get("message", "")
-    elif isinstance(payload.get("text"), str):
-        texto_mensagem = payload["text"]
-    elif "message" in payload and isinstance(payload["message"], str):
-        texto_mensagem = payload["message"]
-    elif "body" in payload and isinstance(payload["body"], str):
-        texto_mensagem = payload["body"]
+    if isinstance(data, dict):
+        if isinstance(data.get("text"), dict):
+            texto_mensagem = data["text"].get("message", "")
+        elif isinstance(data.get("text"), str):
+            texto_mensagem = data["text"]
+        elif "message" in data and isinstance(data["message"], str):
+            texto_mensagem = data["message"]
+        elif "body" in data and isinstance(data["body"], str):
+            texto_mensagem = data["body"]
+
+    if not texto_mensagem:
+        if isinstance(payload.get("text"), dict):
+            texto_mensagem = payload["text"].get("message", "")
+        elif isinstance(payload.get("text"), str):
+            texto_mensagem = payload["text"]
+        elif "message" in payload and isinstance(payload["message"], str):
+            texto_mensagem = payload["message"]
+        elif "body" in payload and isinstance(payload["body"], str):
+            texto_mensagem = payload["body"]
 
     # Validação de mensagem vazia ou sem remetente
     if not texto_mensagem or not remetente:
         return {"status": "Mensagem vazia ignorada."}
 
-    # 3. EVITA LOOP INFINITO: Ignora mensagens geradas pelo próprio robô
-    if "ShieldGuard" in texto_mensagem or "GOLPE DETECTADO" in texto_mensagem:
+    # 3. EVITA LOOP INFINITO: Ignora apenas mensagens geradas pelo próprio robô (não bloqueia mais o 'fromMe')
+    if "ShieldGuard" in texto_mensagem or "GOLPE DETECTADO" in texto_mensagem or "ATENÇÃO: MENSAGEM" in texto_mensagem:
         return {"status": "Mensagem do próprio ShieldGuard ignorada."}
 
     # 🛑 TRAVA DEFINITIVA: Se a mensagem NÃO contiver "http" (links), ignora na hora!
@@ -95,7 +117,6 @@ async def whatsapp_webhook(payload: dict):
                 resposta_zap += f"• {motivo}\n"
 
     # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA ZAP-API
-    # URL e Headers adaptados para o padrão da nova API
     url_envio = f"https://api.zap-api.tech/instances/{ZAPI_INSTANCE_ID}/messages/send-text"
 
     headers = {
