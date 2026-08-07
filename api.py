@@ -71,7 +71,7 @@ async def whatsapp_webhook(payload: dict):
     if not texto_mensagem or not remetente:
         return {"status": "Mensagem vazia ignorada."}
 
-    # 3. EVITA LOOP INFINITO: Ignora apenas mensagens geradas pelo próprio robô (não bloqueia mais o 'fromMe')
+    # 3. EVITA LOOP INFINITO: Ignora apenas mensagens geradas pelo próprio robô
     if "ShieldGuard" in texto_mensagem or "GOLPE DETECTADO" in texto_mensagem or "ATENÇÃO: MENSAGEM" in texto_mensagem:
         return {"status": "Mensagem do próprio ShieldGuard ignorada."}
 
@@ -116,15 +116,19 @@ async def whatsapp_webhook(payload: dict):
             for motivo in link.get("motivos", []):
                 resposta_zap += f"• {motivo}\n"
 
-    # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA ZAP-API
-    url_envio = f"https://api.zap-api.tech/instances/{ZAPI_INSTANCE_ID}/messages/send-text"
+    # 6. DISPARO ASSÍNCRONO DA RESPOSTA VIA ZAP-API (Atualizado para a rota /v1/ e body correto)
+    url_envio = f"https://api.zap-api.tech/v1/instances/{ZAPI_INSTANCE_ID}/send"
 
     headers = {
         "Authorization": f"Bearer {ZAPI_TOKEN}",
         "Content-Type": "application/json",
     }
 
-    body = {"phone": remetente, "message": resposta_zap}
+    body = {
+        "phone": remetente,
+        "type": "text",
+        "body": resposta_zap
+    }
 
     try:
         async with httpx.AsyncClient() as client:
