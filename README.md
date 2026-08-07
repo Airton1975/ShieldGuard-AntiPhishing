@@ -1,61 +1,41 @@
-<!--
-==============================================================================
-ShieldGuard - Sistema de Gestão e Proteção Antiphishing
-Copyright (c) 2026 Airton Luis Barboza. Todos os direitos reservados.
-==============================================================================
--->
+# 🛡️ ShieldGuard - Anti-Phishing & Security API
 
-# 🛡️ ShieldGuard Anti-Phishing
+> **Status do Projeto:** Em fase ativa de desenvolvimento e testes. 
+> Este sistema faz parte de um projeto acadêmico de Análise e Desenvolvimento de Sistemas (ADS).
 
-O **ShieldGuard** é uma API REST desenvolvida em Python (FastAPI) projetada para detectar e analisar tentativas de *phishing* e golpes digitais contidos em mensagens. O sistema é integrado ao **WhatsApp via Webhook (Z-API)** e combina inteligência global de ameaças com verificações locais e consultas oficiais em registros de domínios para classificar o risco de links recebidos.
+## 📝 Sobre o Projeto
+O ShieldGuard é uma API robusta desenvolvida em **FastAPI** projetada para proteger usuários contra ataques de phishing. O sistema atua como uma camada de defesa que analisa, em tempo real, URLs suspeitas recebidas por múltiplos canais (como WhatsApp) e conteúdos de e-mails, utilizando uma abordagem de segurança em camadas para identificar ameaças antes que elas causem danos.
 
 ---
 
-## 🚀 Funcionalidades
+## 🔍 Fluxo de Análise e Pipeline de Segurança
 
-* **Integração via Webhook:** Recebe e processa mensagens em tempo real encaminhadas via Z-API no WhatsApp.
-* **Filtro de Processamento Inteligente:** Descarta mensagens sem links (`http/https`) e possui travas de segurança para prevenir *loops infinitos* de mensagens geradas pelo próprio sistema.
-* **Motor de Análise Multi-Camadas:**
-  1. **Base Global (VirusTotal API):** Checa primeiro se a URL já possui relatórios globais de *malware* ou *phishing*.
-  2. **Análise Heurística Local:** Caso a URL não seja apontada na base global, o motor verifica typosquatting, imitação de marcas registradas, TLDs de alto risco e contexto financeiro em `data/dominio.json`.
-  3. **Validação de Registro Nacional (Registro.br RDAP API):** Para domínios terminados em `.br`, realiza consulta em tempo real para verificar a existência do registro e detectar domínios criados recentemente (menos de 30 dias).
-* **Alertas Automáticos:** Envia respostas formatadas diretamente no WhatsApp do remetente detalhando o **Score de Risco (0 a 100)** e todas as **Evidências Detectadas**.
+O ShieldGuard utiliza uma lógica sequencial e integrada para garantir alta precisão na detecção de ameaças:
+
+### 1. Pipeline de Análise de URLs (WhatsApp e Outros Canais)
+Independentemente de a URL vir de uma mensagem de WhatsApp ou de outra fonte, o link passa pelo seguinte fluxo rigoroso:
+* **Consulta ao VirusTotal:** A URL é enviada imediatamente para a API do VirusTotal, que realiza uma varredura com dezenas de provedores globais de segurança.
+* **Fiscalização Heurística:** Caso o VirusTotal retorne limpo (sem acusar ameaças diretas), o sistema ativa uma análise heurística própria, verificando padrões suspeitos na estrutura do link.
+* **Consulta Registro.br:** O sistema realiza uma consulta de domínio no Registro.br para validar a legitimidade, data de registro e o histórico daquele endereço web.
+
+### 2. Análise Completa de E-mails
+O e-mail recebe um tratamento abrangente que **aplica o mesmo pipeline de tratamento de URL mencionado acima**, somado a uma camada especializada para o corpo da mensagem:
+* **Tratamento da URL do E-mail:** Qualquer link encontrado no corpo da mensagem passa exatamente pelo mesmo fluxo de segurança (VirusTotal ➔ Fiscalização Heurística ➔ Registro.br).
+* **Análise de Conteúdo (Texto):** O motor do sistema examina o texto do e-mail procurando por itens suspeitos, gatilhos mentais de urgência, termos comuns em golpes de engenharia social e falsificação.
+* **Consulta à API do Google:** Validação cruzada com ferramentas e APIs do Google para enriquecer a verificação de autenticidade da mensagem e do remetente.
 
 ---
 
-## 🔬 Fluxo de Análise da Mensagem
+## ⚙️ Tecnologias e Ferramentas
+* **Backend:** Python e FastAPI.
+* **Processamento:** Gunicorn (servidor de aplicação) e Uvicorn (worker ASGI).
+* **Segurança e Consultas:** Integração com APIs externas (VirusTotal, Registro.br, Google).
+* **Automação e Raspagem:** Selenium e BeautifulSoup.
+* **Hospedagem:** Render (Plataforma Cloud).
 
-```text
-[ Mensagem do WhatsApp ] 
-         │
-         ▼
-[ Webhook (api.py) ] ──(Sem links / Próprio Bot?) ──► [ Ignora ]
-         │
-         ▼
-[ Motor de Detecção (detector.py) ]
-         │
-         ├── 1º Passo: Consulta API VirusTotal (Ameaça Global)
-         │      └─► Se malicioso/suspeito: Aplica pontuação crítica
-         │
-         ├── 2º Passo: Regras Heurísticas e Padrões (dominio.json)
-         │      └─► Valida imitação de marcas, TLDs de risco e termos suspeitos
-         │
-         └── 3º Passo: Consulta RDAP Registro.br (Apenas domínios .br)
-                └─► Checa existência real e data de criação (domínios recentes)
-         │
-         ▼
-[ Disparo de Alerta Z-API ] ──► [ Resposta no WhatsApp ]
-## 📁 Estrutura do Projeto
+---
 
-```text
-ShieldGuard-AntiPhishing/
-├── core/
-│   └── detector.py         # Lógica do motor de análise de Phishing
-├── data/
-│   └── dominio.json        # Base local de domínios e regras
-├── .env                    # Variáveis de ambiente locais (Ignorado no Git)
-├── .env.example            # Modelo de variáveis de ambiente
-├── .gitignore              # Arquivos ignorados pelo controle de versão
-├── api.py                  # Ponto de entrada da API FastAPI / Webhook
-├── README.md               # Documentação do projeto
-└── requirements.txt        # Dependências do projeto Python
+## 👤 Autor
+**Airton Luis Barboza**
+* Estudante de Análise e Desenvolvimento de Sistemas (ADS).
+* Conecte-se comigo no [GitHub](https://github.com/Airton1975).
