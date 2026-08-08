@@ -92,7 +92,7 @@ async def whatsapp_webhook(payload: dict):
     # 5. MONTAGEM DA RESPOSTA COM UX DIRETA (ALERTA NO TOPO + PHISHING)
     if score >= 60:
         resposta_zap = (
-            "🚨 *ALERTA: GOLPE DETECTADO!* _(Phishing)_\n"
+            "🚨 *ALERTA: GOLPE DETECTADO!* _(PHISHING)_\n"
             f"🔴 *NÍVEL DE PERIGO:* ALTO ({score}/100)\n\n"
             "🛡️ *RECOMENDAÇÃO:* *NÃO CLIQUE NO LINK* e *NÃO ENVIE SEUS DADOS*!\n"
             "___________________________________\n\n"
