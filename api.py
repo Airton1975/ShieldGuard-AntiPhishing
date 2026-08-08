@@ -23,6 +23,13 @@ detector = AntiPhishingDetector()
 ZAPI_INSTANCE_ID = os.getenv("ZAPI_INSTANCE_ID", "")
 ZAPI_TOKEN = os.getenv("ZAPI_TOKEN", "")
 
+if not ZAPI_TOKEN or not ZAPI_INSTANCE_ID:
+    print(
+        "⚠️ Projeto em fase de testes! Se você quiser testar o código, terá que "
+        "criar uma conta na ZAP-API e substituir os termos ocultos pelas "
+        "suas próprias chaves no arquivo .env."
+    )
+
 
 @router.post("/webhook")
 async def whatsapp_webhook(payload: dict):
